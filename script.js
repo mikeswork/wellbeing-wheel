@@ -6,10 +6,16 @@
    License: MIT License
 */
 
+var validPts = [
+    [{"x":352,"y":195},{"x":401,"y":147},{"x":452,"y":94}],
+    [{"x":334,"y":238},{"x":382,"y":304},{"x":431,"y":373}],
+    [{"x":309,"y":211},{"x":239,"y":166},{"x":159,"y":127}]
+];
+
 var bgImg = new Image();
 var shapes = new Array();
 var complete = false;
-var canvas = document.getElementById("jPolygon");
+var canvas = document.getElementById("wheel");
 var ctx;
 
 function line_intersects(p0, p1, p2, p3) {
@@ -88,6 +94,30 @@ function draw(end){
    
 }
 
+function findNearest(clX, clY, snap = true) {
+    if (!snap) return {x: clX, y: clY};  // Debug override
+
+    let tDistance;
+    let snapX = 1;
+    let snapY = 1;
+    let pGroup;
+
+    validPts.forEach((group, indx) => {
+        group.forEach(pt => {
+            const newTDist = Math.abs(pt.x - clX) + Math.abs(pt.y - clY);
+            if (newTDist < tDistance || tDistance === undefined) {
+                snapX = pt.x;
+                snapY = pt.y;
+
+                tDistance = newTDist;
+                pGroup = indx;
+            }
+        })
+    })
+
+    return {x: snapX, y: snapY, index: pGroup};
+}
+
 function point_it(event) {
     var rect, x, y;
 
@@ -115,8 +145,8 @@ function point_it(event) {
         return false;
     } else {
         rect = canvas.getBoundingClientRect();
-        x = event.clientX - rect.left;
-        y = event.clientY - rect.top;
+        const { x, y } = findNearest(event.clientX - rect.left, event.clientY - rect.top);
+
         if (perimeter.length>0 && x == perimeter[perimeter.length-1]['x'] && y == perimeter[perimeter.length-1]['y']){
             // same point - double click
             return false;
