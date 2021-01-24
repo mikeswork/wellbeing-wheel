@@ -13,8 +13,8 @@ var validPts = [
 ];
 
 var bgImg = new Image();
-var shapes = new Array();
-var complete = false;
+var shapes = [];
+var shapeIndx = 0;
 var canvas = document.getElementById("wheel");
 var ctx;
 
@@ -37,7 +37,7 @@ function line_intersects(p0, p1, p2, p3) {
     return false; // No collision
 }
 
-function point(x, y){
+function vertex(x, y){
     ctx.fillStyle="white";
     ctx.strokeStyle = "white";
     ctx.fillRect(x-2,y-2,4,4);
@@ -45,7 +45,8 @@ function point(x, y){
 }
 
 function reset() {
-    shapes = new Array();
+    shapes = [];
+    shapeIndx = 0;
     clear_canvas();
 }
 
@@ -55,27 +56,28 @@ function clear_canvas(){
     prep_canvas();
 }
 
-function draw(end){
+function draw(){
     clear_canvas();
     ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.lineCap = "square";
     // ctx.beginPath();
     const realCtx = ctx;
-    shapes.forEach((perimeter, indx) => {
+    shapes.forEach((shape, indx) => {
+        perimeter = shape.points;
+
         let ctx = new Path2D();
         for(var i=0; i<perimeter.length; i++){
             if(i==0){
                 ctx.moveTo(perimeter[i]['x'],perimeter[i]['y']);
-                end || point(perimeter[i]['x'],perimeter[i]['y']);
+                shape.isComplete || vertex(perimeter[i]['x'],perimeter[i]['y']);
             } else {
                 ctx.lineTo(perimeter[i]['x'],perimeter[i]['y']);
-                end || point(perimeter[i]['x'],perimeter[i]['y']);
+                shape.isComplete || vertex(perimeter[i]['x'],perimeter[i]['y']);
             }
         }
 
-        // If end of latest shape or current shape/perimeter being drawn was completed previously
-        if(end || indx < shapes.length-1){
+        if(shape.isComplete){
             ctx.lineTo(perimeter[0]['x'],perimeter[0]['y']);
             ctx.closePath();
             realCtx.fillStyle = indx % 2 ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 0, 255, 0.5)';
@@ -119,42 +121,46 @@ function findNearest(clX, clY, snap = true) {
 }
 
 function point_it(event) {
-    var rect, x, y;
+    var rect;
 
-    let perimeter;
-    if (shapes.length == 0 || complete == true) {
-        perimeter = new Array();
-        shapes.push(perimeter)
-        complete = false;
+    // TODO: Hook shapeIndx into toggle switch
+    let perimeter = shapes[shapeIndx] && shapes[shapeIndx].points || [];
+
+    rect = canvas.getBoundingClientRect();
+    const { x, y, index } = findNearest(event.clientX - rect.left, event.clientY - rect.top);
+
+    if (index < perimeter.length) {
+        // Replace existing point
+        perimeter[index].x = x;
+        perimeter[index].y = y;
     } else {
-        perimeter = shapes[shapes.length-1];
-    }
-    // var perimeter = shapes.length > 0 ?  : new Array();
-
-    if(event.ctrlKey || event.which === 3 || event.button === 2){
-        if(perimeter.length==2){
-            alert('You need at least three points for a polygon');
-            return false;
-        }
-        x = perimeter[0]['x'];
-        y = perimeter[0]['y'];
-
-        draw(true);
-        complete = true;
-	    event.preventDefault();
-        return false;
-    } else {
-        rect = canvas.getBoundingClientRect();
-        const { x, y } = findNearest(event.clientX - rect.left, event.clientY - rect.top);
-
-        if (perimeter.length>0 && x == perimeter[perimeter.length-1]['x'] && y == perimeter[perimeter.length-1]['y']){
-            // same point - double click
-            return false;
-        }
+        // Point doesn't exist, create new one
         perimeter.push({'x':x,'y':y});
-        draw(false);
-        return false;
     }
+
+    let isComplete = shapes[shapeIndx] && shapes[shapeIndx].isComplete;
+
+    finalX = perimeter[0].x;
+    finalY = perimeter[0].y;
+
+    if (!isComplete) {
+        if (perimeter.length === validPts.length) {
+            // Final point was created above--move to the first point automatically
+            perimeter.push({'x':finalX,'y':finalY});
+
+            isComplete = true;
+        }
+    } else {
+        // Always update the existing first/last point in case it changed
+        const fIndex = perimeter.length - 1;
+        perimeter[fIndex].x = finalX;
+        perimeter[fIndex].y = finalY;
+    }
+
+    shapes[shapeIndx] = { "isComplete": isComplete, "points": perimeter };
+    
+    draw();
+    return false;
 }
 
 function start() {
