@@ -7,9 +7,10 @@
 */
 
 var validPts = [
-    [{"x":352,"y":195},{"x":401,"y":147},{"x":452,"y":94}],
-    [{"x":334,"y":238},{"x":382,"y":304},{"x":431,"y":373}],
-    [{"x":309,"y":211},{"x":239,"y":166},{"x":159,"y":127}]
+    [{"x":343,"y":252},{"x":374,"y":226},{"x":436,"y":175},{"x":343,"y":252}],
+    [{"x":339,"y":276},{"x":377,"y":295},{"x":445,"y":328},{"x":339,"y":276}],
+    [{"x":301,"y":278},{"x":265,"y":300},{"x":201,"y":338},{"x":301,"y":278}],
+    [{"x":302,"y":254},{"x":261,"y":235},{"x":184,"y":194},{"x":302,"y":254}]
 ];
 
 var bgImg = new Image();
@@ -96,7 +97,7 @@ function draw(){
    
 }
 
-function findNearest(clX, clY, snap = true) {
+function findSnap(clX, clY, snap = true) {
     if (!snap) return {x: clX, y: clY};  // Debug override
 
     let tDistance;
@@ -124,10 +125,14 @@ function point_it(event) {
     var rect;
 
     // TODO: Hook shapeIndx into toggle switch
-    let perimeter = shapes[shapeIndx] && shapes[shapeIndx].points || [];
+    // let perimeter = shapes[shapeIndx] && shapes[shapeIndx].points || [];
+
+    if (!shapes[shapeIndx]) shapes[shapeIndx] = { isComplete: false, points: [] };
+    let shape = shapes[shapeIndx];
+    let perimeter = shape.points;
 
     rect = canvas.getBoundingClientRect();
-    const { x, y, index } = findNearest(event.clientX - rect.left, event.clientY - rect.top);
+    const { x, y, index } = findSnap(event.clientX - rect.left, event.clientY - rect.top);
 
     if (index < perimeter.length) {
         // Replace existing point
@@ -138,17 +143,16 @@ function point_it(event) {
         perimeter.push({'x':x,'y':y});
     }
 
-    let isComplete = shapes[shapeIndx] && shapes[shapeIndx].isComplete;
-
     finalX = perimeter[0].x;
     finalY = perimeter[0].y;
 
-    if (!isComplete) {
+    if (!shape.isComplete) {
         if (perimeter.length === validPts.length) {
             // Final point was created above--move to the first point automatically
             perimeter.push({'x':finalX,'y':finalY});
 
-            isComplete = true;
+            shape.isComplete = true;
+            shapeIndx = 1;
         }
     } else {
         // Always update the existing first/last point in case it changed
@@ -156,8 +160,6 @@ function point_it(event) {
         perimeter[fIndex].x = finalX;
         perimeter[fIndex].y = finalY;
     }
-
-    shapes[shapeIndx] = { "isComplete": isComplete, "points": perimeter };
     
     draw();
     return false;
