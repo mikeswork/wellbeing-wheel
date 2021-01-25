@@ -1,11 +1,3 @@
-/*
-   jPolygon - a ligthweigth javascript library to draw polygons over HTML5 canvas images.
-   Project URL: http://www.matteomattei.com/projects/jpolygon
-   Author: Matteo Mattei <matteo.mattei@gmail.com>
-   Version: 1.0
-   License: MIT License
-*/
-
 var validPts = [
     [{"x":343,"y":252},{"x":374,"y":226},{"x":436,"y":175},{"x":343,"y":252}],
     [{"x":339,"y":276},{"x":377,"y":295},{"x":445,"y":328},{"x":339,"y":276}],
@@ -18,37 +10,29 @@ var shapes = [];
 var shapeIndx = 0;
 var canvas = document.getElementById("wheel");
 var ctx;
+const toggle = document.getElementById("shape-toggle");
 
-function line_intersects(p0, p1, p2, p3) {
-    var s1_x, s1_y, s2_x, s2_y;
-    s1_x = p1['x'] - p0['x'];
-    s1_y = p1['y'] - p0['y'];
-    s2_x = p3['x'] - p2['x'];
-    s2_y = p3['y'] - p2['y'];
-
-    var s, t;
-    s = (-s1_y * (p0['x'] - p2['x']) + s1_x * (p0['y'] - p2['y'])) / (-s2_x * s1_y + s1_x * s2_y);
-    t = ( s2_x * (p0['y'] - p2['y']) - s2_y * (p0['x'] - p2['x'])) / (-s2_x * s1_y + s1_x * s2_y);
-
-    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
-    {
-        // Collision detected
-        return true;
+function reset() {
+    shapes = [];
+    shapeIndx = 0;
+    clear_canvas();   
+    
+    if (toggle) {
+        toggle.disabled = true;
+        toggle.checked = false;
     }
-    return false; // No collision
+}
+
+function toggleShape() {
+    shapeIndx = shapeIndx ? 0 : 1;
+    console.log(shapeIndx)
 }
 
 function vertex(x, y){
     ctx.fillStyle="white";
     ctx.strokeStyle = "white";
-    ctx.fillRect(x-2,y-2,4,4);
+    ctx.fillRect(x-3,y-3,6,6);
     ctx.moveTo(x,y);
-}
-
-function reset() {
-    shapes = [];
-    shapeIndx = 0;
-    clear_canvas();
 }
 
 function clear_canvas(){
@@ -62,30 +46,32 @@ function draw(){
     ctx.lineWidth = 1;
     ctx.strokeStyle = "white";
     ctx.lineCap = "square";
-    // ctx.beginPath();
-    const realCtx = ctx;
+    
     shapes.forEach((shape, indx) => {
-        perimeter = shape.points;
+        const perimeter = shape.points;
+        const path = new Path2D();
 
-        let ctx = new Path2D();
         for(var i=0; i<perimeter.length; i++){
-            if(i==0){
-                ctx.moveTo(perimeter[i]['x'],perimeter[i]['y']);
-                shape.isComplete || vertex(perimeter[i]['x'],perimeter[i]['y']);
-            } else {
-                ctx.lineTo(perimeter[i]['x'],perimeter[i]['y']);
+            // Draw point/line only if current point has coordinates
+            if (perimeter[i] !== undefined) {
+                if (i == 0) {
+                    path.moveTo(perimeter[i]['x'],perimeter[i]['y']);
+                } else {
+                    path.lineTo(perimeter[i]['x'],perimeter[i]['y']);
+                }
+
                 shape.isComplete || vertex(perimeter[i]['x'],perimeter[i]['y']);
             }
         }
 
         if(shape.isComplete){
-            ctx.lineTo(perimeter[0]['x'],perimeter[0]['y']);
-            ctx.closePath();
-            realCtx.fillStyle = indx % 2 ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 0, 255, 0.5)';
-            realCtx.fill(ctx);
-            realCtx.strokeStyle = 'white';
+            path.lineTo(perimeter[0]['x'],perimeter[0]['y']);
+            path.closePath();
+            ctx.fillStyle = indx % 2 ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 0, 255, 0.5)';
+            ctx.fill(path);
+            ctx.strokeStyle = 'white';
         }
-        realCtx.stroke(ctx);
+        ctx.stroke(path);
     
         // print coordinates
         if(perimeter.length == 0){
@@ -105,6 +91,7 @@ function findSnap(clX, clY, snap = true) {
     let snapY = 1;
     let pGroup;
 
+    // Look through all valid points and find the closest to user's click
     validPts.forEach((group, indx) => {
         group.forEach(pt => {
             const newTDist = Math.abs(pt.x - clX) + Math.abs(pt.y - clY);
@@ -124,41 +111,46 @@ function findSnap(clX, clY, snap = true) {
 function point_it(event) {
     var rect;
 
-    // TODO: Hook shapeIndx into toggle switch
-    // let perimeter = shapes[shapeIndx] && shapes[shapeIndx].points || [];
+    if (!shapes[shapeIndx]) {
+        shapes[shapeIndx] = { 
+            isComplete: false, 
+            points: validPts.map(() => undefined) // Begin with array of undefined points
+        };
+    } 
 
-    if (!shapes[shapeIndx]) shapes[shapeIndx] = { isComplete: false, points: [] };
     let shape = shapes[shapeIndx];
     let perimeter = shape.points;
 
     rect = canvas.getBoundingClientRect();
     const { x, y, index } = findSnap(event.clientX - rect.left, event.clientY - rect.top);
 
-    if (index < perimeter.length) {
-        // Replace existing point
-        perimeter[index].x = x;
-        perimeter[index].y = y;
-    } else {
-        // Point doesn't exist, create new one
-        perimeter.push({'x':x,'y':y});
-    }
-
-    finalX = perimeter[0].x;
-    finalY = perimeter[0].y;
+    perimeter[index] = {'x':x,'y':y};
 
     if (!shape.isComplete) {
-        if (perimeter.length === validPts.length) {
+        // Complete if all points have been set
+        if (perimeter.every(point => point !== undefined)) {
             // Final point was created above--move to the first point automatically
-            perimeter.push({'x':finalX,'y':finalY});
+            perimeter.push({'x':perimeter[0].x,'y':perimeter[0].y});
 
             shape.isComplete = true;
-            shapeIndx = 1;
+
+            if (shapeIndx === 0) {
+                // Automatically toggle to second shape after first shape is complete
+                shapeIndx = 1;
+            } else {
+                // Show toggle switch after second shape is complete
+                if (toggle) {
+                    toggle.disabled = false;
+                    toggle.checked = true;
+                }
+            }            
         }
     } else {
-        // Always update the existing first/last point in case it changed
+        // When shape is complete, always update the existing first/last point 
+        // (created automatically) in case it should change based on an update to the shape
         const fIndex = perimeter.length - 1;
-        perimeter[fIndex].x = finalX;
-        perimeter[fIndex].y = finalY;
+        perimeter[fIndex].x = perimeter[0].x;
+        perimeter[fIndex].y = perimeter[0].y;
     }
     
     draw();
